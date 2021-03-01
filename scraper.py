@@ -59,7 +59,6 @@ def validate(string, border=1451595600):
                 return string, err
         return data, err 
     except json.decoder.JSONDecodeError as err:
-        err = str(err).replace("'",'"')
         return string, err
 
 if __name__ == "__main__":
