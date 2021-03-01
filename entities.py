@@ -5,34 +5,29 @@ import json
 
 class Event:
 
-    def __init__ (self, report, date):
-        self.is_valid = False
-        self.data = {}
-        self.row = ''
-        self.error = ValueError('')
+    def __init__ (self, row, report, date):
         self.report = report
         self.date = date
+        self.row = row
+        self.data = {}
+        self.error = ValueError('')
 
-    def set_valid(self, data):
-        self.is_valid = True
+    def _set_data(self, data):
         self.data = data
+        return True
     
-    def set_error(self, row, error):
-        self.row =row
+    def _set_error(self, error):
         self.error = error
+        return False
 
-    def validate(self, row, border=1451595600):
+    def is_valid(self, border=1451595600):
         try:
-            data = json.loads(row)
+            data = json.loads(self.row)
             if data['ts'] < border:
-                try:
-                    raise ValueError('Uncorrect date format')
-
-                except ValueError as err:
-                    self.set_error(row, err)
+                return self._set_error(ValueError('Uncorrect date format'))
             else:
-               self.set_valid(data)
+               return self._set_data(data)
 
         except json.decoder.JSONDecodeError as err:
-            self.set_error(row, err)
+            return self._set_error(err)
 

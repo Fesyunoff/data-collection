@@ -28,8 +28,7 @@ def main():
     content_strings = data.split('\n')
     for row in content_strings:
         if row != '':
-            event = ent.Event(report, date)
-            event.validate(row)
+            event = ent.Event(row, report, date)
             storage.insert_to_storage(event)
 
 def get_data(file_name):

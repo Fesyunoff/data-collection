@@ -41,7 +41,7 @@ class Storage:
 
     
     def insert_to_storage(self, event: entities.Event):
-        if event.is_valid == True:
+        if event.is_valid():
             execute_query(self.insert_valid_SQL(event.data), self._conn,True)
         else:
             execute_query(self.insert_error_SQL(event.report, 
