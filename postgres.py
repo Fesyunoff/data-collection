@@ -3,6 +3,7 @@
 
 import json
 import psycopg2
+import entities
 
 def get_client(verbose=False):
     conn_info = {
@@ -25,15 +26,31 @@ def execute_query(query, conn, verbose=False):
     cur.close()
     conn.commit()
 
-class Input:
+class Storage:
 
-    def __init__(self, schema, input_table, conn):
+    def __init__(self, schema, input_table, error_table, conn):
         self._schema_name = schema
-        self._table_name = input_table
+        self._input_table = input_table
+        self._error_table = error_table
         self._conn = conn
-        execute_query(self.create_table_SQL(), self._conn, True)
+    
+    def prepeare_storage(self):
 
-    def create_table_SQL(self):
+        execute_query(self.create_input_table_SQL(), self._conn, True)
+        execute_query(self.create_error_table_SQL(), self._conn, True)
+
+    
+    def insert_to_storage(self, event: entities.Event):
+        if event.is_valid == True:
+            execute_query(self.insert_valid_SQL(event.data), self._conn,True)
+        else:
+            execute_query(self.insert_error_SQL(event.report, 
+                                                event.date, 
+                                                event.row, 
+                                                str(event.error).replace("'",'"')), 
+                                                self._conn, True)
+
+    def create_input_table_SQL(self):
         return """
     CREATE SCHEMA IF NOT EXISTS %(schema_name)s;
 
@@ -45,36 +62,10 @@ class Input:
           ip VARCHAR  
          );""" % {
         'schema_name': self._schema_name,
-        'table_name': self._table_name,
+        'table_name': self._input_table,
     }
 
-
-    def insert_row_SQL(self, data):
-        return """
-
-    INSERT INTO %(schema_name)s.%(table_name)s(
-    user_id, ts, context, ip)
-    VALUES (
-    %(user_id)d, to_timestamp(%(ts)f), '%(context)s', '%(ip)s'
-         );""" % {
-        'schema_name': self._schema_name,
-        'table_name': self._table_name,
-        'user_id': data['user'],
-        'ts': data['ts'],
-        'context': json.dumps(data['context']),
-        'ip': data['ip']
-    }
-    
-class Error:
-
-    def __init__(self, schema, error_table, conn):
-        self._schema_name = schema
-        self._table_name = error_table
-        self._conn = conn
-        execute_query(self.create_table_SQL(), self._conn, True)
-    
-
-    def create_table_SQL(self):
+    def create_error_table_SQL(self):
         return """
     CREATE SCHEMA IF NOT EXISTS %(schema_name)s;
 
@@ -87,11 +78,26 @@ class Error:
          ins_ts TIMESTAMP 
          );""" % {
         'schema_name': self._schema_name,
-        'table_name': self._table_name,
+        'table_name': self._error_table,
     }
 
+    def insert_valid_SQL(self, data):
+        return """
 
-    def insert_row_SQL(self, report, date, row, error):
+    INSERT INTO %(schema_name)s.%(table_name)s(
+    user_id, ts, context, ip)
+    VALUES (
+    %(user_id)d, to_timestamp(%(ts)f), '%(context)s', '%(ip)s'
+         );""" % {
+        'schema_name': self._schema_name,
+        'table_name': self._input_table,
+        'user_id': data['user'],
+        'ts': data['ts'],
+        'context': json.dumps(data['context']),
+        'ip': data['ip']
+    }
+    
+    def insert_error_SQL(self, report, date, row, error):
         return """
 
     INSERT INTO %(schema_name)s.%(table_name)s(
@@ -100,7 +106,7 @@ class Error:
     '%(report)s', to_date('%(date)s', 'YYYY-MM-DD'),'%(row)s', '%(error)s', NOW()
          );""" % {
         'schema_name': self._schema_name,
-        'table_name': self._table_name,
+        'table_name': self._error_table,
         'report': report,
         'date': date,
         'row': row,

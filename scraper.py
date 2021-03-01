@@ -7,6 +7,7 @@ import shutil
 import json
 import psycopg2
 import postgres as db
+import entities as ent
 
 
 def main():
@@ -19,19 +20,17 @@ def main():
     file_name = '{0}-{1}.{2}.gz'.format(report, date, file_format)
 
     conn = db.get_client(True)
-    i = db.Input(schema, input_table, conn)
-    e = db.Error(schema, error_table, conn)
+    storage = db.Storage(schema, input_table, error_table, conn)
+    storage.prepeare_storage()
 
     data = get_data(file_name)
 
     content_strings = data.split('\n')
     for row in content_strings:
         if row != '':
-            data, err = validate(row)
-            if err != '':
-                db.execute_query(e.insert_row_SQL(report, date, row, str(err).replace("'",'"')), conn, True)
-            else:
-                db.execute_query(i.insert_row_SQL(data), conn, True)
+            event = ent.Event(report, date)
+            event.validate(row)
+            storage.insert_to_storage(event)
 
 def get_data(file_name):
 
@@ -47,19 +46,6 @@ def get_data(file_name):
     file_string = file_bytes.decode('utf-8')
     f.close()
     return file_string
-
-def validate(string, border=1451595600):
-    err = ''
-    try:
-        data = json.loads(string)
-        if data['ts'] < border:
-            try:
-                raise ValueError('Uncorrect date format')
-            except ValueError as err:
-                return string, err
-        return data, err 
-    except json.decoder.JSONDecodeError as err:
-        return string, err
 
 if __name__ == "__main__":
     main()  
